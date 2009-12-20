@@ -62,11 +62,9 @@ groupSameSuffix l = group 1024 l
 
 formatSizeField :: Int -> [[(Integer, String)]] -> [[(Float, String, String)]]
 formatSizeField _ []     = []
-formatSizeField n (x:xs) = formatGroup x : formatSizeField (n + 1) xs
-    where formatGroup :: [(Integer, String)] -> [(Float, String, String)]
-          formatGroup [] = []
-          formatGroup ((size, path):rest) = (size', suffixes !! n, path) : formatGroup rest
-            where size' = fromInteger size / (fromIntegral 1024 ^ n)
+formatSizeField n (x:xs) = map formatGroup x : formatSizeField (n + 1) xs
+    where formatGroup (size, path) = (size', suffixes !! n, path)
+              where size' = fromInteger size / (fromIntegral 1024 ^ n)
 
 suffixes :: [String]
 suffixes = ["KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"]
