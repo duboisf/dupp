@@ -1,0 +1,13 @@
+Name:                dupp
+Version:             0.1
+Description:         a du clone with prettier output
+License:             GPL
+License-file:        LICENSE
+Author:              Fred Dubois
+Maintainer:          fred.dubois@gmail.com
+Build-Type:          Simple
+Cabal-Version:       >=1.2
+
+Executable dupp
+  Main-is:           dupp.hs
+  Build-Depends:     base >= 3 && < 5, process >= 1.0.1.2
