@@ -1,8 +1,10 @@
 import Control.Monad (unless, when)
 import Data.List (sortBy)
 import Data.Ord (comparing)
+import System.Directory (doesDirectoryExist, getDirectoryContents)
 import System.Environment (getArgs)
 import System.Exit
+import System.FilePath ((</>))
 import System.Process (readProcessWithExitCode)
 import Text.Printf (printf)
 
@@ -40,6 +42,37 @@ printGroups list =
                   when (currentRow /= lastRow) $
                      printf "%7.1f %s   %s\n" size suffix path >>
                      printGroup ys
+
+data DirSize = DirSize {
+      dsSize :: Int
+    , dsPath :: FilePath
+    }
+
+partitionM :: Monad m => (a -> m Bool) -> [a] -> m ([a], [a])
+partitionM p l = partitionM' p l ([], [])
+  where
+    partitionM' :: Monad m => (a -> m Bool) -> [a] -> ([a], [a]) -> m ([a], [a])
+    partitionM' _ [] r = return r
+    partitionM' p (x:xs) (ys, zs) =
+        p x >>= \bool ->
+        if bool
+           then partitionM' p xs (x:ys, zs)
+           else partitionM' p xs (ys, x:zs)
+
+getFilesRecursively :: FilePath -> IO [FilePath]
+getFilesRecursively dir = getFilesRecursively' [dir]
+  where
+    getFilesRecursively' [] = return []
+    getFilesRecursively' (dir:dirs) =
+        getDirectoryContents dir >>=
+        partitionM doesDirectoryExist . map (dir </>) . filter (`notElem` [".", ".."]) >>= \(newDirs, files) ->
+        getFilesRecursively' (dirs ++ newDirs) >>= \newFiles ->
+        return (files ++ newFiles)
+
+--getDirSizes :: [FilePath] -> IO [DirSize]
+--getDirSizes x:xs =
+--    getDirectoryContents x >>= \contents ->
+--    :
 
 getDUOutput :: FilePath -> IO String
 getDUOutput path =
