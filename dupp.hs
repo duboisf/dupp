@@ -1,4 +1,6 @@
+import Control.Monad (unless, when)
 import Data.List (sortBy)
+import Data.Ord (comparing)
 import System.Environment (getArgs)
 import System.Exit
 import System.Process (readProcessWithExitCode)
@@ -18,7 +20,7 @@ doPrettyPrintDU args =
     getDUOutput path >>=
     printGroups . formatSizeField 0 . groupSameSuffix . sortOnFst . parseOutput . lines
     where path = if null args then "." else head args
-          sortOnFst = sortBy (\x y -> fst x `compare` fst y)
+          sortOnFst = sortBy $ comparing fst
 
 printGroups :: [[(Float, String, String)]] -> IO ()
 printGroups list =
@@ -27,21 +29,17 @@ printGroups list =
     putStrLn seperator >>
     printf "    Total for %s: %0.1f %s\n" totalPath totalSize totalSuffix >>
     putStrLn ""
-        where seperator = take 40 . repeat $ '-'
+        where seperator = replicate 40 '-'
               lastRow@(totalSize, totalSuffix, totalPath) = last . last $ list
               printGroups' [] = return ()
               printGroups' (x:xs) =
                   printGroup x >>
-                  if null xs
-                     then return ()
-                     else putStrLn seperator >>
-                          printGroups' xs
+                  unless (null xs) (putStrLn seperator >> printGroups' xs)
               printGroup [] = return ()
               printGroup (currentRow@(size, suffix, path):ys) =
-                  if currentRow /= lastRow
-                     then printf "%7.1f %s   %s\n" size suffix path >>
-                          printGroup ys
-                     else return ()
+                  when (currentRow /= lastRow) $
+                     printf "%7.1f %s   %s\n" size suffix path >>
+                     printGroup ys
 
 getDUOutput :: FilePath -> IO String
 getDUOutput path =
@@ -59,8 +57,8 @@ groupSameSuffix :: [(Integer, String)] -> [[(Integer, String)]]
 groupSameSuffix l = group 1024 l
     where group :: Integer -> [(Integer, String)] -> [[(Integer, String)]]
           group _     [] = []
-          group limit xs = let (currentGroup, rest) = span (\x -> fst x < limit) xs
-                               in [currentGroup] ++ group (limit * 1024) rest
+          group limit xs = currentGroup : group (limit * 1024) rest
+              where (currentGroup, rest) = span (\x -> fst x < limit) xs
 
 formatSizeField :: Int -> [[(Integer, String)]] -> [[(Float, String, String)]]
 formatSizeField _ []     = []
@@ -68,7 +66,7 @@ formatSizeField n (x:xs) = formatGroup x : formatSizeField (n + 1) xs
     where formatGroup :: [(Integer, String)] -> [(Float, String, String)]
           formatGroup [] = []
           formatGroup ((size, path):rest) = (size', suffixes !! n, path) : formatGroup rest
-            where size' = (fromInteger size) / (fromIntegral 1024 ^ n)
+            where size' = fromInteger size / (fromIntegral 1024 ^ n)
 
 suffixes :: [String]
 suffixes = ["KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"]
