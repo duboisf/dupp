@@ -1,26 +1,32 @@
 import Control.Monad (unless, when)
-import Data.List (sortBy)
+import Data.List (delete, sortBy)
 import Data.Ord (comparing)
 import System.Environment (getArgs)
 import System.Exit
+import System.IO (hPutStrLn, stderr)
 import System.Process (readProcessWithExitCode)
 import Text.Printf (printf)
 
 main =
-    getArgs >>= \args ->
-    if length args < 2
-       then doPrettyPrintDU args >> exitWith ExitSuccess
-       else putStrLn usage >> exitFailure
+    getArgs >>=
+    fixArgs >>= \args ->
+    doPrettyPrintDU args >> exitWith ExitSuccess
+
+fixArgs :: [String] -> IO [String]
+fixArgs args =
+    if "-h" `elem` args
+       then hPutStrLn stderr "(Warning: ignoring -h parameter)\n" >>
+            return (delete "-h" args)
+       else return args
 
 usage :: String
 usage = "usage: dupp [PATH]"
 
 doPrettyPrintDU :: [String] -> IO ()
 doPrettyPrintDU args =
-    getDUOutput path >>=
+    getDUOutput args >>=
     printGroups . formatSizeField 0 . groupSameSuffix . sortOnFst . parseOutput . lines
-    where path = if null args then "." else head args
-          sortOnFst = sortBy $ comparing fst
+        where sortOnFst = sortBy $ comparing fst
 
 printGroups :: [[(Float, String, String)]] -> IO ()
 printGroups list =
@@ -39,9 +45,9 @@ printGroups list =
                      printf "%7.1f %s   %s\n" size suffix path >>
                      printGroup ys
 
-getDUOutput :: FilePath -> IO String
-getDUOutput path =
-    readProcessWithExitCode "du" ["--max-depth=1", path] "" >>= \(code, out, err) ->
+getDUOutput :: [String] -> IO String
+getDUOutput args =
+    readProcessWithExitCode "du" args "" >>= \(code, out, err) ->
     case code of
          ExitSuccess -> return out
          _           -> putStr err >> exitFailure
