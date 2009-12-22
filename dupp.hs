@@ -24,17 +24,15 @@ doPrettyPrintDU args =
 
 printGroups :: [[(Float, String, String)]] -> IO ()
 printGroups list =
-    putStrLn "" >>
     printGroups' list >>
-    putStrLn seperator >>
-    printf "    Total for %s: %0.1f %s\n" totalPath totalSize totalSuffix >>
-    putStrLn ""
-        where seperator = replicate 40 '-'
-              lastRow@(totalSize, totalSuffix, totalPath) = last . last $ list
+    putStrLn "" >>
+    printf "%7.1f %s   %s\n" totalSize totalSuffix totalPath
+        where lastRow@(totalSize, totalSuffix, totalPath) = last . last $ list
               printGroups' [] = return ()
               printGroups' (x:xs) =
                   printGroup x >>
-                  unless (null xs) (putStrLn seperator >> printGroups' xs)
+                  unless (null x || null xs || xs == [[lastRow]]) (putStrLn "") >>
+                  printGroups' xs
               printGroup [] = return ()
               printGroup (currentRow@(size, suffix, path):ys) =
                   when (currentRow /= lastRow) $
