@@ -11,6 +11,5 @@ Cabal-Version:       >=1.2
 Executable dupp
   Main-is:           dupp.hs
   Build-Depends:     base >= 3 && < 5,
-                     process >= 1.0.1.2,
                      directory >= 1.0.0.3,
                      filepath >= 1.1.0.2

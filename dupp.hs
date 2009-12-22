@@ -1,11 +1,12 @@
-import Control.Monad (unless, when)
+import Control.Exception (bracket)
+import Control.Monad (filterM, liftM, unless, when)
 import Data.List (sortBy)
 import Data.Ord (comparing)
-import System.Directory (doesDirectoryExist, getDirectoryContents)
+import System.Directory (doesDirectoryExist, doesFileExist, getDirectoryContents)
 import System.Environment (getArgs)
 import System.Exit
 import System.FilePath ((</>))
-import System.Process (readProcessWithExitCode)
+import System.IO (hClose, hFileSize, openFile, IOMode(ReadMode))
 import Text.Printf (printf)
 
 main =
@@ -23,6 +24,8 @@ doPrettyPrintDU args =
     printGroups . formatSizeField 0 . groupSameSuffix . sortOnFst . parseOutput . lines
     where path = if null args then "." else head args
           sortOnFst = sortBy $ comparing fst
+
+getDUOutput = undefined
 
 printGroups :: [[(Float, String, String)]] -> IO ()
 printGroups list =
@@ -44,9 +47,9 @@ printGroups list =
                      printGroup ys
 
 data DirSize = DirSize {
-      dsSize :: Int
+      dsSize :: Integer
     , dsPath :: FilePath
-    }
+    } deriving Show
 
 partitionM :: Monad m => (a -> m Bool) -> [a] -> m ([a], [a])
 partitionM p l = partitionM' p l ([], [])
@@ -59,6 +62,36 @@ partitionM p l = partitionM' p l ([], [])
            then partitionM' p xs (x:ys, zs)
            else partitionM' p xs (ys, x:zs)
 
+getDirSizes :: Int -> FilePath -> IO [DirSize]
+getDirSizes maxDepth path = getDirSizes' 1 [path]
+  where
+    getDirSizes' :: Int -> [FilePath] -> IO [DirSize]
+    getDirSizes' _ [] = return []
+    getDirSizes' depth (path:paths) =
+        if depth < maxDepth
+           then getDirsAndFiles path >>= \(dirs, files) ->
+                getDirSizes' (depth + 1) (dirs ++ paths) >>= \dirSizes ->
+                return $ DirSize (foldr (\x y -> dsSize x + y) 0 dirSizes) path : dirSizes
+           else getFilesRecursively path >>= \files ->
+                mapM getFileSize files >>= \fileSizes ->
+                getDirSizes' (depth + 1) paths >>= \dirSizes ->
+                return $ DirSize (sum fileSizes) path : dirSizes
+
+getFileSize :: FilePath -> IO Integer
+getFileSize path = bracket (openFile path ReadMode) hClose hFileSize
+
+getDirContents :: FilePath -> IO [FilePath]
+getDirContents p = return . filter (`notElem` [".", ".."]) =<< getDirectoryContents p
+
+getDirsAndFiles :: FilePath -> IO ([FilePath], [FilePath])
+getDirsAndFiles path = partitionM doesDirectoryExist =<< getDirContents path
+
+getDirs :: FilePath -> IO [FilePath]
+getDirs path = liftM fst $ getDirsAndFiles path
+
+getFiles :: FilePath -> IO [FilePath]
+getFiles path = liftM snd $ getDirsAndFiles path
+
 getFilesRecursively :: FilePath -> IO [FilePath]
 getFilesRecursively dir = getFilesRecursively' [dir]
   where
@@ -66,20 +99,7 @@ getFilesRecursively dir = getFilesRecursively' [dir]
     getFilesRecursively' (dir:dirs) =
         getDirectoryContents dir >>=
         partitionM doesDirectoryExist . map (dir </>) . filter (`notElem` [".", ".."]) >>= \(newDirs, files) ->
-        getFilesRecursively' (dirs ++ newDirs) >>= \newFiles ->
-        return (files ++ newFiles)
-
---getDirSizes :: [FilePath] -> IO [DirSize]
---getDirSizes x:xs =
---    getDirectoryContents x >>= \contents ->
---    :
-
-getDUOutput :: FilePath -> IO String
-getDUOutput path =
-    readProcessWithExitCode "du" ["--max-depth=1", path] "" >>= \(code, out, err) ->
-    case code of
-         ExitSuccess -> return out
-         _           -> putStr err >> exitFailure
+        fmap (files ++) $ getFilesRecursively' (dirs ++ newDirs)
 
 parseOutput :: [String] -> [(Integer, String)]
 parseOutput []     = []
