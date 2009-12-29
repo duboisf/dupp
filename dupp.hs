@@ -74,8 +74,7 @@ getDirSizes maxDepth path = getDirSizes' 1 [path]
                 return $ DirSize (foldr (\x y -> dsSize x + y) 0 dirSizes) path : dirSizes
            else getFilesRecursively path >>= \files ->
                 mapM getFileSize files >>= \fileSizes ->
-                getDirSizes' (depth + 1) paths >>= \dirSizes ->
-                return $ DirSize (sum fileSizes) path : dirSizes
+                fmap (DirSize (sum fileSizes) path :) (getDirSizes' (depth + 1) paths)
 
 getFileSize :: FilePath -> IO Integer
 getFileSize path = bracket (openFile path ReadMode) hClose hFileSize
@@ -87,10 +86,10 @@ getDirsAndFiles :: FilePath -> IO ([FilePath], [FilePath])
 getDirsAndFiles path = partitionM doesDirectoryExist =<< getDirContents path
 
 getDirs :: FilePath -> IO [FilePath]
-getDirs path = liftM fst $ getDirsAndFiles path
+getDirs = liftM fst . getDirsAndFiles
 
 getFiles :: FilePath -> IO [FilePath]
-getFiles path = liftM snd $ getDirsAndFiles path
+getFiles = liftM snd . getDirsAndFiles
 
 getFilesRecursively :: FilePath -> IO [FilePath]
 getFilesRecursively dir = getFilesRecursively' [dir]
