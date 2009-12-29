@@ -1,45 +1,48 @@
 import Control.Exception (bracket)
 import Control.Monad (filterM, liftM, unless, when)
-import Data.List (sortBy)
+import Data.List (delete, sortBy)
 import Data.Ord (comparing)
 import System.Directory (doesDirectoryExist, doesFileExist, getDirectoryContents)
 import System.Environment (getArgs)
 import System.Exit
 import System.FilePath ((</>))
-import System.IO (hClose, hFileSize, openFile, IOMode(ReadMode))
+import System.IO (hClose, hFileSize, hPutStrLn, openFile, IOMode(ReadMode), stderr)
 import Text.Printf (printf)
 
 main =
-    getArgs >>= \args ->
-    if length args < 2
-       then doPrettyPrintDU args >> exitWith ExitSuccess
-       else putStrLn usage >> exitFailure
+    getArgs >>=
+    fixArgs >>= \args ->
+    doPrettyPrintDU args >> exitWith ExitSuccess
+
+fixArgs :: [String] -> IO [String]
+fixArgs args =
+    if "-h" `elem` args
+       then hPutStrLn stderr "(Warning: ignoring -h parameter)\n" >>
+            return (delete "-h" args)
+       else return args
 
 usage :: String
 usage = "usage: dupp [PATH]"
 
 doPrettyPrintDU :: [String] -> IO ()
 doPrettyPrintDU args =
-    getDUOutput path >>=
+    getDUOutput args >>=
     printGroups . formatSizeField 0 . groupSameSuffix . sortOnFst . parseOutput . lines
-    where path = if null args then "." else head args
-          sortOnFst = sortBy $ comparing fst
+        where sortOnFst = sortBy $ comparing fst
 
 getDUOutput = undefined
 
 printGroups :: [[(Float, String, String)]] -> IO ()
 printGroups list =
-    putStrLn "" >>
     printGroups' list >>
-    putStrLn seperator >>
-    printf "    Total for %s: %0.1f %s\n" totalPath totalSize totalSuffix >>
-    putStrLn ""
-        where seperator = replicate 40 '-'
-              lastRow@(totalSize, totalSuffix, totalPath) = last . last $ list
+    putStrLn "" >>
+    printf "%7.1f %s   %s\n" totalSize totalSuffix totalPath
+        where lastRow@(totalSize, totalSuffix, totalPath) = last . last $ list
               printGroups' [] = return ()
               printGroups' (x:xs) =
                   printGroup x >>
-                  unless (null xs) (putStrLn seperator >> printGroups' xs)
+                  unless (null x || null xs || xs == [[lastRow]]) (putStrLn "") >>
+                  printGroups' xs
               printGroup [] = return ()
               printGroup (currentRow@(size, suffix, path):ys) =
                   when (currentRow /= lastRow) $
