@@ -101,7 +101,7 @@ getFilesRecursively dir = getFilesRecursively' [dir]
     getFilesRecursively' (dir:dirs) =
         getDirectoryContents dir >>=
         partitionM doesDirectoryExist . map (dir </>) . filter (`notElem` [".", ".."]) >>= \(newDirs, files) ->
-        fmap (files ++) $ getFilesRecursively' (dirs ++ newDirs)
+        (files ++) `fmap` getFilesRecursively' (dirs ++ newDirs)
 
 parseOutput :: [String] -> [(Integer, String)]
 parseOutput []     = []
