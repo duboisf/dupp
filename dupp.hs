@@ -83,7 +83,7 @@ getFileSize :: FilePath -> IO Integer
 getFileSize path = bracket (openFile path ReadMode) hClose hFileSize
 
 getDirContents :: FilePath -> IO [FilePath]
-getDirContents p = return . filter (`notElem` [".", ".."]) =<< getDirectoryContents p
+getDirContents p = filter (`notElem` [".", ".."]) `fmap` getDirectoryContents p
 
 getDirsAndFiles :: FilePath -> IO ([FilePath], [FilePath])
 getDirsAndFiles path = partitionM doesDirectoryExist =<< getDirContents path
