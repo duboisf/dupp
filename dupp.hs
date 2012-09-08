@@ -43,6 +43,7 @@ printGroups list =
                   printGroup x >>
                   unless (null x || null xs || xs == [[lastRow]]) (putStrLn "") >>
                   printGroups' xs
+              printGroup :: [(Float, String, String)] -> IO ()
               printGroup [] = return ()
               printGroup (currentRow@(size, suffix, path):ys) =
                   when (currentRow /= lastRow) $
